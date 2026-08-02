@@ -1,367 +1,111 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="hi">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>auty Mobile</title>
-  
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Telegram Mini App</title>
   <!-- Telegram WebApp SDK -->
   <script src="https://telegram.org/js/telegram-web-app.js"></script>
-
   <style>
-    /* Global Reset */
-    html, body {
-      margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; font-family: "Amazon Ember", Arial, sans-serif;
-      background: #000;
-    }
-    
-    /* Full Screen Content Wrapper */
-    #app-container {
-      width: 100%; height: 100%; display: none; border: none;
-    }
-    
-    /* LOGIN UI CSS */
-    #login-overlay { 
-      position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: 3000; 
-      display: none; justify-content: center; align-items: center; flex-direction: column; 
-    }
-    .login-new-user-bg { 
-      background: linear-gradient(135deg, #000000, #1a0b2e, #001f3f); color: white; 
-      width: 100%; height: 100%; display: flex; flex-direction: column; 
-      align-items: center; justify-content: center; padding: 20px; box-sizing: border-box;
-      overflow-y: auto;
-    }
-    .login-warning { 
-      color: #ff3333; font-size: 2rem; font-weight: 900; margin-bottom: 10px; 
-      letter-spacing: 2px; text-shadow: 0 0 10px rgba(255, 0, 0, 0.5); 
-    }
-    .login-note { 
-      text-align: center; color: #e6f3ff; font-size: 0.9rem; margin-bottom: 20px; 
-      max-width: 300px; line-height: 1.4; 
-    }
-    .login-anim-text { 
-      font-size: 1.5rem; font-weight: bold; background: linear-gradient(90deg, #007bff, #b19cd9, #87ceeb); 
-      -webkit-background-clip: text; background-clip: text; color: transparent; margin-bottom: 15px; 
-      animation: textFlow 3s infinite linear; 
-    }
-    @keyframes textFlow { 0% { filter: hue-rotate(0deg); } 100% { filter: hue-rotate(360deg); } }
-
-    .social-icons { display: flex; gap: 20px; margin-bottom: 20px; }
-    .social-icon svg { width: 32px; height: 32px; fill: #87ceeb; filter: drop-shadow(0 0 5px #007bff); }
-
-    /* Telegram Widget Container */
-    .telegram-widget-container {
-      margin-bottom: 15px;
-      min-height: 40px;
-      display: flex;
-      justify-content: center;
-      align-items: center;
-    }
-
-    /* Profile Display Card */
-    #profile-card {
-      display: none;
-      margin-top: 15px;
+    body {
+      font-family: Arial, sans-serif;
       text-align: center;
-      color: white;
-      background: rgba(255, 255, 255, 0.05);
-      padding: 15px 25px;
+      background-color: #f4f4f9;
+      color: #333;
+      margin: 0;
+      padding: 20px;
+    }
+    .container {
+      max-width: 400px;
+      margin: 50px auto;
+      background: #fff;
+      padding: 25px;
       border-radius: 12px;
-      border: 1px solid rgba(255, 255, 255, 0.1);
-      box-shadow: 0 4px 15px rgba(0,0,0,0.5);
+      box-shadow: 0 4px 15px rgba(0,0,0,0.1);
     }
-    #profile-photo {
-      width: 80px;
-      height: 80px;
-      border-radius: 50%;
-      border: 2px solid #4fc3f7;
-      object-fit: cover;
-      box-shadow: 0 0 10px rgba(79, 195, 247, 0.4);
-    }
-
-    /* Diagnostics Box for Debugging */
-    .debug-box {
-      margin-top: 15px;
-      background: rgba(255, 0, 0, 0.15);
-      border: 1px solid #ff4444;
-      border-radius: 8px;
-      padding: 10px;
-      font-size: 0.8rem;
-      color: #ffcccc;
-      max-width: 320px;
-      text-align: left;
+    .error-card {
       display: none;
-      word-break: break-word;
+      background-color: #ffe6e6;
+      border: 1px solid #ff4d4d;
+      color: #cc0000;
+      padding: 15px;
+      border-radius: 8px;
+    }
+    .loader {
+      font-size: 16px;
+      color: #666;
     }
   </style>
 </head>
 <body>
 
-  <!-- Actual Web App Container -->
-  <iframe id="app-container" sandbox="allow-scripts allow-same-origin allow-forms allow-modals"></iframe>
+  <!-- External Browser Block Screen -->
+  <div id="error-screen" class="container error-card">
+    <h2>⚠️ Access Denied</h2>
+    <p>Yeh web app sirf official <b>Telegram App</b> ke andar hi open ho sakti hai.</p>
+    <p>Kripya is link ko Telegram Bot ke zariye kholein.</p>
+  </div>
 
-  <!-- LOGIN UI OVERLAY -->
-  <div id="login-overlay">
-    <div id="login-state-new" class="login-new-user-bg">
-        <div class="login-warning">WARNING</div>
-        <div class="login-note">
-            This is used to prank your friends, if you are using this illegally that's your responsibility.
-        </div>
-        <div class="login-anim-text">@Dark_bot</div>
-        
-        <div class="social-icons">
-            <div class="social-icon">
-                <svg viewBox="0 0 24 24"><path d="M12 0C5.373 0 0 5.373 0 12s5.373 12 12 12 12-5.373 12-12S18.627 0 12 0zm5.894 8.221l-1.97 9.28c-.145.658-.537.818-1.084.508l-3-2.21-1.446 1.394c-.16.16-.295.293-.605.293l.213-3.053 5.56-5.022c.242-.213-.054-.334-.373-.121l-6.869 4.326-2.96-.924c-.64-.203-.658-.64.135-.954l11.566-4.458c.538-.196 1.006.128.832.941z"/></svg>
-            </div>
-        </div>
-
-        <!-- Telegram Widget Container (For Web Browsers) -->
-        <div class="telegram-widget-container" id="tg-widget-root"></div>
-        
-        <!-- Profile Display Card -->
-        <div id="profile-card">
-            <img id="profile-photo" src="" alt="Profile Photo">
-            <h2 id="profile-name" style="margin: 10px 0 3px 0; font-size: 1.2rem;"></h2>
-            <div style="color: #87ceeb; font-size: 0.9rem;">
-                <span id="profile-username"></span>
-            </div>
-            <div style="margin-top: 12px; color: #bbb; font-size: 0.8rem; letter-spacing: 1px;">TELEGRAM USER ID</div>
-            <div id="profile-id" style="font-size: 1.4rem; font-weight: bold; color: #ff4444; margin-top: 2px;"></div>
-        </div>
-
-        <!-- Main Status & Error Message -->
-        <p id="login-msg" style="margin-top: 15px; font-weight: bold; color: #87ceeb; text-align: center; max-width: 320px; line-height: 1.4;"></p>
-
-        <!-- Debug Information Box -->
-        <div id="debug-box" class="debug-box">
-          <strong style="color: #ff3333;">🔍 Diagnostics Info:</strong>
-          <div id="debug-details" style="margin-top: 5px;"></div>
-        </div>
-    </div>
+  <!-- App Main Content -->
+  <div id="app-container" class="container">
+    <h2>Authenticating...</h2>
+    <p class="loader" id="status-text">Telegram session verify ho raha hai, kripya intezar karein...</p>
   </div>
 
   <script>
-    // ---------------- CONFIGURATION ----------------
-    const WEB_APP_URL = "https://script.google.com/macros/s/AKfycbwIag-Un_XnwHClHKFVzSNzyKf_-kTuThZPIK1PBWGQdzPXP_oI5jQS7zo85ZQ6jS0lqA/exec";
-    const STORAGE_KEY = "cached_html_content";
-    const CACHE_TIME_KEY = "cache_timestamp";
-    const CACHE_VALIDITY_MS = 60 * 60 * 1000; // 1 hour cache
-    
-    const BOT_USERNAME = "Flipcart900_bot"; 
-    // -----------------------------------------------
+    // 🔗 Aapka Google Apps Script Web App URL
+    const GAS_WEB_APP_URL = 'YOUR_GOOGLE_APPS_SCRIPT_DEPLOYMENT_URL_HERE';
 
-    window.onload = function() {
-      document.getElementById('login-overlay').style.display = 'flex';
+    document.addEventListener("DOMContentLoaded", function () {
+      const tg = window.Telegram ? window.Telegram.WebApp : null;
 
-      // 1. TELEGRAM MINI APP DETECTION
-      if (window.Telegram && window.Telegram.WebApp) {
-        const tgWebApp = window.Telegram.WebApp;
-        tgWebApp.ready();
-        tgWebApp.expand();
-
-        const rawInitData = tgWebApp.initData;
-        const user = tgWebApp.initDataUnsafe?.user;
-
-        // CASE 1: Opened in Telegram Mini App but no InitData available
-        if (!rawInitData || !user) {
-          showCustomError(
-            "❌ Telegram Session Not Detected",
-            "ERR_MISSING_INITDATA: Mini App open via Telegram Bot button."
-          );
-          return;
-        }
-
-        const userPayload = {
-          id: user.id,
-          first_name: user.first_name,
-          last_name: user.last_name,
-          username: user.username,
-          photo_url: user.photo_url,
-          initData: rawInitData,
-          is_mini_app: true
-        };
-
-        document.getElementById('tg-widget-root').style.display = 'none';
-        onTelegramAuth(userPayload);
+      // 🚨 CHECK 1: Verifies if opened inside Telegram WebApp environment
+      if (!tg || !tg.initData || tg.initData.trim() === "") {
+        document.getElementById('app-container').style.display = 'none';
+        document.getElementById('error-screen').style.display = 'block';
         return;
       }
 
-      // 2. EXTERNAL BROWSER CACHE CHECK
-      try {
-        const storedHtml = localStorage.getItem(STORAGE_KEY);
-        const cacheTime = localStorage.getItem(CACHE_TIME_KEY);
-        const now = new Date().getTime();
+      // Telegram UI initialization
+      tg.ready();
+      tg.expand();
 
-        if (storedHtml && cacheTime && (now - cacheTime < CACHE_VALIDITY_MS)) {
-          injectDirectly(storedHtml);
-          return;
-        }
-      } catch (e) {
-        console.warn("LocalStorage restricted.");
+      // Extract user details securely from Telegram SDK
+      const user = tg.initDataUnsafe ? tg.initDataUnsafe.user : null;
+
+      if (!user || !user.id) {
+        document.getElementById('status-text').innerText = "User details fetch nahi ho paaye. Phir se koshish karein.";
+        return;
       }
-      
-      // 3. SHOW WIDGET IF IN NORMAL CHROME/BROWSER
-      loadTelegramWidget();
-    };
 
-    function loadTelegramWidget() {
-      const container = document.getElementById('tg-widget-root');
-      container.innerHTML = ''; 
-      const script = document.createElement('script');
-      
-      script.src = "https://telegram.org/js/telegram-widget.js?22";
-      script.setAttribute('data-telegram-login', BOT_USERNAME);
-      script.setAttribute('data-size', 'large');
-      script.setAttribute('data-radius', '8');
-      script.setAttribute('data-onauth', 'onTelegramAuth(user)');
-      script.setAttribute('data-request-access', 'write');
-      
-      container.appendChild(script);
-    }
+      // Prepare payload to send to Google Apps Script
+      const payload = {
+        id: user.id,
+        first_name: user.first_name || '',
+        username: user.username || '',
+        initData: tg.initData,
+        is_mini_app: true
+      };
 
-    async function onTelegramAuth(user) {
-      const statusMsg = document.getElementById('login-msg');
-      const profile = document.getElementById("profile-card");
-      hideDebug();
+      // 📤 Send request to Google Apps Script via GET
+      const requestUrl = `${GAS_WEB_APP_URL}?data=${encodeURIComponent(JSON.stringify(payload))}`;
 
-      // Populate Profile Card
-      document.getElementById("profile-photo").src = user.photo_url || "https://telegram.org/img/t_logo.png";
-      document.getElementById("profile-name").textContent = user.first_name + (user.last_name ? " " + user.last_name : "");
-      document.getElementById("profile-username").textContent = user.username ? "@" + user.username : "No Username";
-      document.getElementById("profile-id").textContent = user.id || "Unknown";
-
-      profile.style.display = "block";
-      statusMsg.style.color = "#87ceeb";
-      statusMsg.innerText = "Connecting to verification server...";
-
-      try {
-        // GET request parameter prevents CORS Preflight Network Failures in Telegram Webview
-        const requestUrl = WEB_APP_URL + "?data=" + encodeURIComponent(JSON.stringify(user));
-
-        const response = await fetch(requestUrl, {
-          method: 'GET'
+      fetch(requestUrl)
+        .then(response => response.json())
+        .then(data => {
+          if (data.success && data.url) {
+            // Authorized -> Redirect to secret GitHub page
+            window.location.href = data.url;
+          } else {
+            // Unauthorized or Sheet check failed
+            document.getElementById('status-text').innerText = data.message || "Access Denied!";
+          }
+        })
+        .catch(err => {
+          console.error(err);
+          document.getElementById('status-text').innerText = "Server connecting error! Dobara try karein.";
         });
-
-        if (!response.ok) {
-          showCustomError(
-            "❌ Server Error (" + response.status + ")",
-            "ERR_HTTP_" + response.status + ": Google Apps Script URL is not reachable."
-          );
-          return;
-        }
-
-        let result;
-        try {
-          result = await response.json();
-        } catch (jsonErr) {
-          showCustomError(
-            "❌ Invalid Backend Response",
-            "ERR_BAD_JSON: Check Google Apps Script deployment permission (Must be set to 'Anyone')."
-          );
-          return;
-        }
-
-        // SUCCESSFUL AUTHENTICATION
-        if (result.success && result.url) {
-          statusMsg.style.color = "#00ff66";
-          statusMsg.innerText = "✅ Access Granted!";
-          await fetchAndCacheContent(result.url);
-        } else {
-          handleBackendError(result.message, user.id);
-        }
-
-      } catch (networkError) {
-        showCustomError(
-          "❌ Network Failure",
-          "ERR_NETWORK_FAILED: " + networkError.toString()
-        );
-      }
-    }
-
-    function handleBackendError(serverMessage, userId) {
-      const msg = serverMessage || "Access Denied.";
-
-      if (msg.includes("spoofing detected")) {
-        showCustomError(
-          "❌ Security Hash Mismatch",
-          "ERR_HASH_FAILED: Mini App Data signature did not match. Ensure BOT_TOKEN in code.gs is correct."
-        );
-      } else if (msg.includes("Unauthorized")) {
-        showCustomError(
-          "❌ ID Not Found in Sheet",
-          `ERR_UNAUTHORIZED: Telegram ID (${userId}) is not present in Column A of the 'Passwords' tab.`
-        );
-      } else if (msg.includes("Passwords")) {
-        showCustomError(
-          "❌ Sheet Tab Missing",
-          "ERR_TAB_MISSING: Tab named 'Passwords' was not found in the Google Sheet."
-        );
-      } else {
-        showCustomError(
-          "❌ Access Denied",
-          "ERR_SERVER_REJECTED: " + msg
-        );
-      }
-    }
-
-    async function fetchAndCacheContent(githubRawUrl) {
-      const statusMsg = document.getElementById('login-msg');
-      try {
-        const githubResponse = await fetch(githubRawUrl);
-        if (!githubResponse.ok) {
-          showCustomError(
-            "❌ GitHub App Fetch Failed",
-            "ERR_GITHUB_HTTP_" + githubResponse.status + ": Failed to download HTML from GitHub."
-          );
-          return;
-        }
-
-        const htmlContent = await githubResponse.text();
-        
-        try {
-          localStorage.setItem(STORAGE_KEY, htmlContent);
-          localStorage.setItem(CACHE_TIME_KEY, new Date().getTime().toString());
-        } catch (e) {
-          console.warn("Cache write restricted.");
-        }
-        
-        setTimeout(() => injectDirectly(htmlContent), 600);
-
-      } catch (error) {
-        showCustomError(
-          "❌ App Load Failed",
-          "ERR_CONTENT_LOAD: Authorized HTML content failed to inject."
-        );
-      }
-    }
-
-    function injectDirectly(htmlContent) {
-      document.getElementById('login-overlay').style.display = 'none';
-      
-      const iframe = document.getElementById('app-container');
-      iframe.style.display = "block";
-      
-      const doc = iframe.contentWindow.document || iframe.contentDocument;
-      doc.open();
-      doc.write(htmlContent);
-      doc.close();
-    }
-
-    function showCustomError(mainTitle, technicalDetail) {
-      const statusMsg = document.getElementById('login-msg');
-      const debugBox = document.getElementById('debug-box');
-      const debugDetails = document.getElementById('debug-details');
-
-      statusMsg.style.color = "#ff4444";
-      statusMsg.innerText = mainTitle;
-
-      debugDetails.innerText = technicalDetail;
-      debugBox.style.display = "block";
-    }
-
-    function hideDebug() {
-      document.getElementById('debug-box').style.display = "none";
-    }
+    });
   </script>
 </body>
 </html>
