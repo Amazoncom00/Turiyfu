@@ -78,6 +78,21 @@
       object-fit: cover;
       box-shadow: 0 0 10px rgba(79, 195, 247, 0.4);
     }
+
+    /* Diagnostics Box for Debugging */
+    .debug-box {
+      margin-top: 15px;
+      background: rgba(255, 0, 0, 0.15);
+      border: 1px solid #ff4444;
+      border-radius: 8px;
+      padding: 10px;
+      font-size: 0.8rem;
+      color: #ffcccc;
+      max-width: 320px;
+      text-align: left;
+      display: none;
+      word-break: break-word;
+    }
   </style>
 </head>
 <body>
@@ -114,8 +129,14 @@
             <div id="profile-id" style="font-size: 1.4rem; font-weight: bold; color: #ff4444; margin-top: 2px;"></div>
         </div>
 
-        <!-- Status & Error Messages -->
-        <p id="login-msg" style="margin-top: 15px; font-weight: bold; color: #87ceeb; text-align: center; max-width: 300px; line-height: 1.4;"></p>
+        <!-- Main Status & Error Message -->
+        <p id="login-msg" style="margin-top: 15px; font-weight: bold; color: #87ceeb; text-align: center; max-width: 320px; line-height: 1.4;"></p>
+
+        <!-- Debug Information Box (Shows Exact Technical Cause) -->
+        <div id="debug-box" class="debug-box">
+          <strong style="color: #ff3333;">🔍 Diagnostics Info:</strong>
+          <div id="debug-details" style="margin-top: 5px;"></div>
+        </div>
     </div>
   </div>
 
@@ -130,14 +151,25 @@
     // -----------------------------------------------
 
     window.onload = function() {
-      // 1. AUTO-DETECT TELEGRAM MINI APP SESSION
-      if (window.Telegram && window.Telegram.WebApp && window.Telegram.WebApp.initData) {
-        window.Telegram.WebApp.ready();
-        window.Telegram.WebApp.expand();
+      document.getElementById('login-overlay').style.display = 'flex';
 
+      // 1. TELEGRAM MINI APP DETECTION
+      if (window.Telegram && window.Telegram.WebApp) {
         const tgWebApp = window.Telegram.WebApp;
+        tgWebApp.ready();
+        tgWebApp.expand();
+
         const rawInitData = tgWebApp.initData;
-        const user = tgWebApp.initDataUnsafe.user || {};
+        const user = tgWebApp.initDataUnsafe?.user;
+
+        // CASE 1: Opened in Telegram Mini App but no InitData available
+        if (!rawInitData || !user) {
+          showCustomError(
+            "❌ Telegram Session Not Detected",
+            "ERR_MISSING_INITDATA: Mini App Telegram ke andar khula hai par initData missing hai. App ko bot ke 'Open App' button se kholein."
+          );
+          return;
+        }
 
         const userPayload = {
           id: user.id,
@@ -149,7 +181,6 @@
           is_mini_app: true
         };
 
-        document.getElementById('login-overlay').style.display = 'flex';
         document.getElementById('tg-widget-root').style.display = 'none';
         onTelegramAuth(userPayload);
         return;
@@ -166,11 +197,10 @@
           return;
         }
       } catch (e) {
-        console.warn("LocalStorage access restricted.");
+        console.warn("LocalStorage restricted.");
       }
       
-      // 3. SHOW LOGIN WIDGET IF IN EXTERNAL BROWSER
-      document.getElementById('login-overlay').style.display = 'flex';
+      // 3. SHOW WIDGET IF IN NORMAL CHROME/BROWSER
       loadTelegramWidget();
     };
 
@@ -192,18 +222,17 @@
     async function onTelegramAuth(user) {
       const statusMsg = document.getElementById('login-msg');
       const profile = document.getElementById("profile-card");
+      hideDebug();
 
-      // Populate & Display Profile Card
+      // Profile View Populate Karein
       document.getElementById("profile-photo").src = user.photo_url || "https://telegram.org/img/t_logo.png";
       document.getElementById("profile-name").textContent = user.first_name + (user.last_name ? " " + user.last_name : "");
       document.getElementById("profile-username").textContent = user.username ? "@" + user.username : "No Username";
-      document.getElementById("profile-id").textContent = user.id || "-";
+      document.getElementById("profile-id").textContent = user.id || "Unknown";
 
       profile.style.display = "block";
-
-      // Update Status Indicator
       statusMsg.style.color = "#87ceeb";
-      statusMsg.innerText = "Authenticating secure session...";
+      statusMsg.innerText = "Connecting to verification server...";
 
       try {
         const response = await fetch(WEB_APP_URL, {
@@ -212,20 +241,69 @@
           body: JSON.stringify(user) 
         });
 
-        const result = await response.json();
-
-        if (result.success && result.url) {
-          statusMsg.style.color = "#00ff66";
-          statusMsg.innerText = "✅ Access Granted";
-          await fetchAndCacheContent(result.url);
-        } else {
-          statusMsg.style.color = "#ff4444";
-          statusMsg.innerText = "❌ " + (result.message || "Access Denied.");
+        // CASE 2: Server HTTP Error
+        if (!response.ok) {
+          showCustomError(
+            "❌ Server Error (" + response.status + ")",
+            "ERR_HTTP_" + response.status + ": Google Apps Script URL reachable nahi hai ya deployment me problem hai."
+          );
+          return;
         }
 
-      } catch (error) {
-        statusMsg.style.color = "#ff4444";
-        statusMsg.innerText = "❌ Network Error. Please try again.";
+        let result;
+        try {
+          result = await response.json();
+        } catch (jsonErr) {
+          // CASE 3: Backend response is not JSON (Script crashed or permissions issue)
+          showCustomError(
+            "❌ Invalid Backend Response",
+            "ERR_BAD_JSON: Apps Script se valid JSON nahi mila. Apps Script Deploy Permission 'Anyone' set hai ya nahi check karein."
+          );
+          return;
+        }
+
+        // SUCCESSFUL AUTHENTICATION
+        if (result.success && result.url) {
+          statusMsg.style.color = "#00ff66";
+          statusMsg.innerText = "✅ Access Granted!";
+          await fetchAndCacheContent(result.url);
+        } else {
+          // SPECIFIC BACKEND ERRORS MAPPING
+          handleBackendError(result.message, user.id);
+        }
+
+      } catch (networkError) {
+        // CASE 4: Network Error / CORS Fail
+        showCustomError(
+          "❌ Network Failure",
+          "ERR_NETWORK_FAILED: Server se connect nahi ho pa raha. Internet Connection ya Google Apps Script URL WebApp Deployment check karein."
+        );
+      }
+    }
+
+    function handleBackendError(serverMessage, userId) {
+      const msg = serverMessage || "Access Denied.";
+
+      if (msg.includes("spoofing detected")) {
+        showCustomError(
+          "❌ Security Hash Mismatch",
+          "ERR_HASH_FAILED: Backend Bot Token aur Telegram Mini App Data ka hash match nahi hua. Direct BotFather se Token verify karke code.gs me update karein."
+        );
+      } else if (msg.includes("Unauthorized")) {
+        showCustomError(
+          "❌ ID Not Found in Sheet",
+          `ERR_UNAUTHORIZED: Telegram ID (${userId}) Google Sheet 'Passwords' tab ke Column A2 me nahi mila.`
+        );
+      } else if (msg.includes("Passwords")) {
+        showCustomError(
+          "❌ Sheet Tab Missing",
+          "ERR_TAB_MISSING: Google Sheet me 'Passwords' naam ka tab nahi mila."
+        );
+      } else {
+        showCustomError(
+          "❌ Access Denied",
+          "ERR_SERVER_REJECTED: " + msg
+        );
       }
     }
 
@@ -233,7 +311,13 @@
       const statusMsg = document.getElementById('login-msg');
       try {
         const githubResponse = await fetch(githubRawUrl);
-        if (!githubResponse.ok) throw new Error(`HTTP Error: ${githubResponse.status}`);
+        if (!githubResponse.ok) {
+          showCustomError(
+            "❌ GitHub App Fetch Failed",
+            "ERR_GITHUB_HTTP_" + githubResponse.status + ": Secret Github HTML URL download nahi ho saka."
+          );
+          return;
+        }
 
         const htmlContent = await githubResponse.text();
         
@@ -241,14 +325,16 @@
           localStorage.setItem(STORAGE_KEY, htmlContent);
           localStorage.setItem(CACHE_TIME_KEY, new Date().getTime().toString());
         } catch (e) {
-          console.warn("Could not save to cache, but app will load.");
+          console.warn("Cache write restricted.");
         }
         
         setTimeout(() => injectDirectly(htmlContent), 600);
 
       } catch (error) {
-        statusMsg.style.color = "#ff4444";
-        statusMsg.innerText = "❌ Failed to download authorized app content.";
+        showCustomError(
+          "❌ App Load Failed",
+          "ERR_CONTENT_LOAD: Authorized HTML content inject karne me fail ho gaya."
+        );
       }
     }
 
@@ -262,6 +348,22 @@
       doc.open();
       doc.write(htmlContent);
       doc.close();
+    }
+
+    function showCustomError(mainTitle, technicalDetail) {
+      const statusMsg = document.getElementById('login-msg');
+      const debugBox = document.getElementById('debug-box');
+      const debugDetails = document.getElementById('debug-details');
+
+      statusMsg.style.color = "#ff4444";
+      statusMsg.innerText = mainTitle;
+
+      debugDetails.innerText = technicalDetail;
+      debugBox.style.display = "block";
+    }
+
+    function hideDebug() {
+      document.getElementById('debug-box').style.display = "none";
     }
   </script>
 </body>
