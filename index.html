@@ -26,13 +26,14 @@
       background: linear-gradient(135deg, #000000, #1a0b2e, #001f3f); color: white; 
       width: 100%; height: 100%; display: flex; flex-direction: column; 
       align-items: center; justify-content: center; padding: 20px; box-sizing: border-box;
+      overflow-y: auto;
     }
     .login-warning { 
       color: #ff3333; font-size: 2rem; font-weight: 900; margin-bottom: 10px; 
       letter-spacing: 2px; text-shadow: 0 0 10px rgba(255, 0, 0, 0.5); 
     }
     .login-note { 
-      text-align: center; color: #e6f3ff; font-size: 0.9rem; margin-bottom: 30px; 
+      text-align: center; color: #e6f3ff; font-size: 0.9rem; margin-bottom: 20px; 
       max-width: 300px; line-height: 1.4; 
     }
     .login-anim-text { 
@@ -42,28 +43,37 @@
     }
     @keyframes textFlow { 0% { filter: hue-rotate(0deg); } 100% { filter: hue-rotate(360deg); } }
 
-    .social-icons { display: flex; gap: 20px; margin-bottom: 30px; }
+    .social-icons { display: flex; gap: 20px; margin-bottom: 20px; }
     .social-icon svg { width: 32px; height: 32px; fill: #87ceeb; filter: drop-shadow(0 0 5px #007bff); }
 
     /* Telegram Widget Container */
     .telegram-widget-container {
-      margin-bottom: 20px;
+      margin-bottom: 15px;
       min-height: 40px;
       display: flex;
       justify-content: center;
       align-items: center;
     }
 
-    /* ID Display Container */
-    .id-display-box {
+    /* Telegram User Profile Card */
+    #profile-card {
+      display: none;
       margin-top: 15px;
-      padding: 12px;
-      background: rgba(255, 255, 255, 0.1);
-      border: 1px dashed #ff3333;
-      border-radius: 8px;
       text-align: center;
-      max-width: 300px;
-      display: none; 
+      color: white;
+      background: rgba(255, 255, 255, 0.05);
+      padding: 15px 25px;
+      border-radius: 12px;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      box-shadow: 0 4px 15px rgba(0,0,0,0.5);
+    }
+    #profile-photo {
+      width: 80px;
+      height: 80px;
+      border-radius: 50%;
+      border: 2px solid #4fc3f7;
+      object-fit: cover;
+      box-shadow: 0 0 10px rgba(79, 195, 247, 0.4);
     }
   </style>
 </head>
@@ -90,21 +100,25 @@
         <!-- Telegram Widget Container -->
         <div class="telegram-widget-container" id="tg-widget-root"></div>
         
-        <!-- Status & Error Messages -->
-        <p id="login-msg" style="color: #87ceeb; margin-top: 10px; font-weight: bold; text-align: center; max-width: 300px;"></p>
-        
-        <!-- Dynamic User ID Display Box -->
-        <div id="id-box" class="id-display-box">
-          <span style="color: #aaa; font-size: 0.85rem; display: block; margin-bottom: 5px;">YOUR TELEGRAM USER ID:</span>
-          <strong id="user-tg-id" style="color: #ff3333; font-size: 1.3rem; letter-spacing: 1px;">-</strong>
+        <!-- Profile Display Card -->
+        <div id="profile-card">
+            <img id="profile-photo" src="" alt="Profile Photo">
+            <h2 id="profile-name" style="margin: 10px 0 3px 0; font-size: 1.2rem;"></h2>
+            <div style="color: #87ceeb; font-size: 0.9rem;">
+                <span id="profile-username"></span>
+            </div>
+            <div style="margin-top: 12px; color: #bbb; font-size: 0.8rem; letter-spacing: 1px;">TELEGRAM USER ID</div>
+            <div id="profile-id" style="font-size: 1.4rem; font-weight: bold; color: #ff4444; margin-top: 2px;"></div>
         </div>
+
+        <!-- Status & Error Messages -->
+        <p id="login-msg" style="margin-top: 15px; font-weight: bold; color: #87ceeb; text-align: center; max-width: 300px; line-height: 1.4;"></p>
     </div>
   </div>
 
   <script>
     // ---------------- CONFIGURATION ----------------
-    // Odl URL as requested
-    const WEB_APP_URL = "https://script.google.com/macros/s/AKfycbxuOyB8R0v3XmueaUFgnH3ySAEOa7UZ5Gma9_5pc69bLCWy-f-pv78bOIve49gAJA0qOw/exec";
+    const WEB_APP_URL = "https://script.google.com/macros/s/AKfycbwIag-Un_XnwHClHKFVzSNzyKf_-kTuThZPIK1PBWGQdzPXP_oI5jQS7zo85ZQ6jS0lqA/exec";
     const STORAGE_KEY = "cached_html_content";
     const CACHE_TIME_KEY = "cache_timestamp";
     const CACHE_VALIDITY_MS = 60 * 60 * 1000; // 1 hour cache
@@ -123,11 +137,9 @@
           return;
         }
       } catch (e) {
-        // Fallback if localStorage is restricted (e.g. Incognito mode)
         console.warn("LocalStorage access restricted.");
       }
       
-      // Show login overlay if cache is expired or missing
       document.getElementById('login-overlay').style.display = 'flex';
       loadTelegramWidget();
     };
@@ -149,15 +161,21 @@
 
     async function onTelegramAuth(user) {
       const statusMsg = document.getElementById('login-msg');
-      const idBox = document.getElementById('id-box');
-      const userTgIdSpan = document.getElementById('user-tg-id');
-      
-      idBox.style.display = "none";
+      const profile = document.getElementById("profile-card");
+
+      // 1. Populate and Display Profile Card
+      document.getElementById("profile-photo").src = user.photo_url || "https://telegram.org/img/t_logo.png";
+      document.getElementById("profile-name").textContent = user.first_name + (user.last_name ? " " + user.last_name : "");
+      document.getElementById("profile-username").textContent = user.username ? "@" + user.username : "No Username";
+      document.getElementById("profile-id").textContent = user.id;
+
+      profile.style.display = "block";
+
+      // 2. Set Status Message
       statusMsg.style.color = "#87ceeb";
-      statusMsg.innerText = "Authenticating secure session with server...";
+      statusMsg.innerText = "Authenticating secure session...";
 
       try {
-        // Send data as text/plain to avoid CORS preflight issues with Google Apps Script
         const response = await fetch(WEB_APP_URL, {
           method: 'POST',
           headers: { 'Content-Type': 'text/plain;charset=utf-8' },
@@ -166,21 +184,18 @@
 
         const result = await response.json();
 
-        // Old Function: Backend sends GitHub URL
         if (result.success && result.url) {
-          statusMsg.style.color = "#28a745";
-          statusMsg.innerText = "Access Granted! Fetching App Content...";
+          statusMsg.style.color = "#00ff66";
+          statusMsg.innerText = "✅ Access Granted";
           await fetchAndCacheContent(result.url);
         } else {
-          statusMsg.style.color = "#ff3333";
-          statusMsg.innerText = result.message || "Access Denied.";
-          userTgIdSpan.innerText = user.id;
-          idBox.style.display = "block";
+          statusMsg.style.color = "#ff4444";
+          statusMsg.innerText = "❌ " + (result.message || "Access Denied.");
         }
 
       } catch (error) {
-        statusMsg.style.color = "#ff3333";
-        statusMsg.innerText = "Network Error. Please try again.";
+        statusMsg.style.color = "#ff4444";
+        statusMsg.innerText = "❌ Network Error. Please try again.";
       }
     }
 
@@ -199,11 +214,12 @@
           console.warn("Could not save to cache, but app will still load.");
         }
         
-        injectDirectly(htmlContent);
+        // Small delay to let the user see "Access Granted" before loading iframe
+        setTimeout(() => injectDirectly(htmlContent), 800);
 
       } catch (error) {
-        statusMsg.style.color = "#ff3333";
-        statusMsg.innerText = "Failed to download authorized app content.";
+        statusMsg.style.color = "#ff4444";
+        statusMsg.innerText = "❌ Failed to download authorized app content.";
       }
     }
 
