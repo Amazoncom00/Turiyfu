@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title>auty Mobile</title>
   
-  <!-- Telegram WebApp SDK (Enables auto-login inside Telegram Mini App) -->
+  <!-- Telegram WebApp SDK -->
   <script src="https://telegram.org/js/telegram-web-app.js"></script>
 
   <style>
@@ -131,20 +131,26 @@
 
     window.onload = function() {
       // 1. AUTO-DETECT TELEGRAM MINI APP SESSION
-      if (window.Telegram && window.Telegram.WebApp && window.Telegram.WebApp.initDataUnsafe?.user) {
+      if (window.Telegram && window.Telegram.WebApp && window.Telegram.WebApp.initData) {
         window.Telegram.WebApp.ready();
         window.Telegram.WebApp.expand();
 
-        const tgData = window.Telegram.WebApp.initDataUnsafe;
+        const tgWebApp = window.Telegram.WebApp;
+        const rawInitData = tgWebApp.initData;
+        const user = tgWebApp.initDataUnsafe.user || {};
+
         const userPayload = {
-          ...tgData.user,
-          auth_date: tgData.auth_date,
-          hash: tgData.hash,
-          is_mini_app: true // Flag for backend detection
+          id: user.id,
+          first_name: user.first_name,
+          last_name: user.last_name,
+          username: user.username,
+          photo_url: user.photo_url,
+          initData: rawInitData,
+          is_mini_app: true
         };
 
         document.getElementById('login-overlay').style.display = 'flex';
-        document.getElementById('tg-widget-root').style.display = 'none'; // Hide login button inside Telegram
+        document.getElementById('tg-widget-root').style.display = 'none';
         onTelegramAuth(userPayload);
         return;
       }
@@ -191,7 +197,7 @@
       document.getElementById("profile-photo").src = user.photo_url || "https://telegram.org/img/t_logo.png";
       document.getElementById("profile-name").textContent = user.first_name + (user.last_name ? " " + user.last_name : "");
       document.getElementById("profile-username").textContent = user.username ? "@" + user.username : "No Username";
-      document.getElementById("profile-id").textContent = user.id;
+      document.getElementById("profile-id").textContent = user.id || "-";
 
       profile.style.display = "block";
 
