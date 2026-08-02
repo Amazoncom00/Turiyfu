@@ -132,7 +132,7 @@
         <!-- Main Status & Error Message -->
         <p id="login-msg" style="margin-top: 15px; font-weight: bold; color: #87ceeb; text-align: center; max-width: 320px; line-height: 1.4;"></p>
 
-        <!-- Debug Information Box (Shows Exact Technical Cause) -->
+        <!-- Debug Information Box -->
         <div id="debug-box" class="debug-box">
           <strong style="color: #ff3333;">🔍 Diagnostics Info:</strong>
           <div id="debug-details" style="margin-top: 5px;"></div>
@@ -166,7 +166,7 @@
         if (!rawInitData || !user) {
           showCustomError(
             "❌ Telegram Session Not Detected",
-            "ERR_MISSING_INITDATA: Mini App Telegram ke andar khula hai par initData missing hai. App ko bot ke 'Open App' button se kholein."
+            "ERR_MISSING_INITDATA: Mini App open via Telegram Bot button."
           );
           return;
         }
@@ -224,7 +224,7 @@
       const profile = document.getElementById("profile-card");
       hideDebug();
 
-      // Profile View Populate Karein
+      // Populate Profile Card
       document.getElementById("profile-photo").src = user.photo_url || "https://telegram.org/img/t_logo.png";
       document.getElementById("profile-name").textContent = user.first_name + (user.last_name ? " " + user.last_name : "");
       document.getElementById("profile-username").textContent = user.username ? "@" + user.username : "No Username";
@@ -235,17 +235,17 @@
       statusMsg.innerText = "Connecting to verification server...";
 
       try {
-        const response = await fetch(WEB_APP_URL, {
-          method: 'POST',
-          headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-          body: JSON.stringify(user) 
+        // GET request parameter prevents CORS Preflight Network Failures in Telegram Webview
+        const requestUrl = WEB_APP_URL + "?data=" + encodeURIComponent(JSON.stringify(user));
+
+        const response = await fetch(requestUrl, {
+          method: 'GET'
         });
 
-        // CASE 2: Server HTTP Error
         if (!response.ok) {
           showCustomError(
             "❌ Server Error (" + response.status + ")",
-            "ERR_HTTP_" + response.status + ": Google Apps Script URL reachable nahi hai ya deployment me problem hai."
+            "ERR_HTTP_" + response.status + ": Google Apps Script URL is not reachable."
           );
           return;
         }
@@ -254,10 +254,9 @@
         try {
           result = await response.json();
         } catch (jsonErr) {
-          // CASE 3: Backend response is not JSON (Script crashed or permissions issue)
           showCustomError(
             "❌ Invalid Backend Response",
-            "ERR_BAD_JSON: Apps Script se valid JSON nahi mila. Apps Script Deploy Permission 'Anyone' set hai ya nahi check karein."
+            "ERR_BAD_JSON: Check Google Apps Script deployment permission (Must be set to 'Anyone')."
           );
           return;
         }
@@ -268,15 +267,13 @@
           statusMsg.innerText = "✅ Access Granted!";
           await fetchAndCacheContent(result.url);
         } else {
-          // SPECIFIC BACKEND ERRORS MAPPING
           handleBackendError(result.message, user.id);
         }
 
       } catch (networkError) {
-        // CASE 4: Network Error / CORS Fail
         showCustomError(
           "❌ Network Failure",
-          "ERR_NETWORK_FAILED: Server se connect nahi ho pa raha. Internet Connection ya Google Apps Script URL WebApp Deployment check karein."
+          "ERR_NETWORK_FAILED: " + networkError.toString()
         );
       }
     }
@@ -287,17 +284,17 @@
       if (msg.includes("spoofing detected")) {
         showCustomError(
           "❌ Security Hash Mismatch",
-          "ERR_HASH_FAILED: Backend Bot Token aur Telegram Mini App Data ka hash match nahi hua. Direct BotFather se Token verify karke code.gs me update karein."
+          "ERR_HASH_FAILED: Mini App Data signature did not match. Ensure BOT_TOKEN in code.gs is correct."
         );
       } else if (msg.includes("Unauthorized")) {
         showCustomError(
           "❌ ID Not Found in Sheet",
-          `ERR_UNAUTHORIZED: Telegram ID (${userId}) Google Sheet 'Passwords' tab ke Column A2 me nahi mila.`
+          `ERR_UNAUTHORIZED: Telegram ID (${userId}) is not present in Column A of the 'Passwords' tab.`
         );
       } else if (msg.includes("Passwords")) {
         showCustomError(
           "❌ Sheet Tab Missing",
-          "ERR_TAB_MISSING: Google Sheet me 'Passwords' naam ka tab nahi mila."
+          "ERR_TAB_MISSING: Tab named 'Passwords' was not found in the Google Sheet."
         );
       } else {
         showCustomError(
@@ -314,7 +311,7 @@
         if (!githubResponse.ok) {
           showCustomError(
             "❌ GitHub App Fetch Failed",
-            "ERR_GITHUB_HTTP_" + githubResponse.status + ": Secret Github HTML URL download nahi ho saka."
+            "ERR_GITHUB_HTTP_" + githubResponse.status + ": Failed to download HTML from GitHub."
           );
           return;
         }
@@ -333,7 +330,7 @@
       } catch (error) {
         showCustomError(
           "❌ App Load Failed",
-          "ERR_CONTENT_LOAD: Authorized HTML content inject karne me fail ho gaya."
+          "ERR_CONTENT_LOAD: Authorized HTML content failed to inject."
         );
       }
     }
